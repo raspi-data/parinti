@@ -1,0 +1,170 @@
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { verifyToken } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import LogoutButton from '@/components/LogoutButton'
+import CheckinButton from '@/components/CheckinButton'
+
+export default async function CaregiverDashboard() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get('token')?.value
+  const payload = token ? await verifyToken(token) : null
+
+  if (!payload || payload.role !== 'CAREGIVER') redirect('/login')
+
+  const caregiver = await prisma.caregiver.findUnique({
+    where: { userId: payload.sub },
+    include: {
+      contracts: {
+        where: { status: 'ACTIVE' },
+        include: {
+          family: true,
+          senior: true,
+          checkins: { orderBy: { createdAt: 'desc' }, take: 3 },
+          journals: { orderBy: { createdAt: 'desc' }, take: 3 },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+    },
+  })
+
+  const totalContracts = caregiver?.contracts.length ?? 0
+  const todayCheckins = caregiver?.contracts.flatMap((c) =>
+    c.checkins.filter(
+      (ch) => new Date(ch.createdAt).toDateString() === new Date().toDateString()
+    )
+  ) ?? []
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-5xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-blue-600">parinti</span>
+            <span className="text-xl font-bold text-gray-400">.care</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-500">{caregiver?.nume || payload.email}</span>
+            <LogoutButton />
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard Ingrijitor</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            {caregiver?.disponibil ? (
+              <span className="text-emerald-600 font-medium">Disponibil</span>
+            ) : (
+              <span className="text-red-500 font-medium">Indisponibil</span>
+            )}{' '}
+            &bull; {caregiver?.judet}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <StatCard label="Contracte active" value={totalContracts} icon="📋" />
+          <StatCard label="Check-in-uri azi" value={todayCheckins.length} icon="✅" />
+          <StatCard label="Tarif zilnic" value={caregiver?.tarif ?? 0} icon="💰" suffix=" RON" />
+        </div>
+
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Contracte active</h2>
+          {!caregiver?.contracts.length ? (
+            <EmptyState
+              icon="📋"
+              title="Niciun contract activ"
+              desc="Completeaza-ti profilul si documentele pentru a primi cereri de la familii."
+            />
+          ) : (
+            <div className="space-y-6">
+              {caregiver.contracts.map((contract) => (
+                <div key={contract.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-gray-900">{contract.senior.nume}</p>
+                      <p className="text-sm text-gray-500">
+                        Familie: {contract.family.userId} &bull; {contract.tarif} RON/zi
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">Program: {contract.program}</p>
+                    </div>
+                    <CheckinButton contractId={contract.id} />
+                  </div>
+
+                  {contract.checkins.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-2">Check-in-uri recente</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {contract.checkins.map((ch) => (
+                          <span
+                            key={ch.id}
+                            className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                              ch.type === 'IN'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-orange-100 text-orange-700'
+                            }`}
+                          >
+                            {ch.type === 'IN' ? 'Sosire' : 'Plecare'}{' '}
+                            {new Date(ch.createdAt).toLocaleTimeString('ro-RO', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {contract.journals.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-2">Jurnal recent</p>
+                      <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600">
+                        {contract.journals[0].text}
+                        {contract.journals[0].hasFlag && (
+                          <span className="ml-2 text-amber-600 font-medium text-xs">⚠ Semnalat</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </main>
+    </div>
+  )
+}
+
+function StatCard({
+  label, value, icon, suffix,
+}: {
+  label: string
+  value: number
+  icon: string
+  suffix?: string
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-2xl">{icon}</span>
+        <span className="text-3xl font-bold text-gray-900">
+          {value}
+          {suffix && <span className="text-base font-medium text-gray-500">{suffix}</span>}
+        </span>
+      </div>
+      <p className="text-sm text-gray-500">{label}</p>
+    </div>
+  )
+}
+
+function EmptyState({ icon, title, desc }: { icon: string; title: string; desc: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center">
+      <div className="text-3xl mb-3">{icon}</div>
+      <p className="font-medium text-gray-700">{title}</p>
+      <p className="text-sm text-gray-400 mt-1">{desc}</p>
+    </div>
+  )
+}

@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  FAMILY
+  CAREGIVER
+  ADMIN
+}
+
+enum DocumentType {
+  CI
+  CAZIER
+  CERTIFICAT_ANC
+  CPR
+  ALTELE
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  REJECTED
+}
+
+enum ContractStatus {
+  ACTIVE
+  PAUSED
+  TERMINATED
+}
+
+enum AlertType {
+  CHECKIN_LATE
+  SOS
+  DOCUMENT_EXPIRING
+  JOURNAL_ANOMALY
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  password      String
+  role          Role
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  family        Family?
+  caregiver     Caregiver?
+}
+
+model Family {
+  id          String     @id @default(cuid())
+  userId      String     @unique
+  user        User       @relation(fields: [userId], references: [id])
+  phone       String?
+  judet       String
+  stripeId    String?
+  plan        String     @default("basic")
+  seniors     Senior[]
+  contracts   Contract[]
+  createdAt   DateTime   @default(now())
+}
+
+model Senior {
+  id          String     @id @default(cuid())
+  familyId    String
+  family      Family     @relation(fields: [familyId], references: [id])
+  nume        String
+  varsta      Int
+  judet       String
+  adresa      String
+  nevoi       String
+  conditii    String?
+  contracts   Contract[]
+  createdAt   DateTime   @default(now())
+}
+
+model Caregiver {
+  id            String         @id @default(cuid())
+  userId        String         @unique
+  user          User           @relation(fields: [userId], references: [id])
+  nume          String
+  phone         String
+  judet         String
+  experienta    Int
+  bio           String?
+  tarif         Float
+  disponibil    Boolean        @default(true)
+  stripeId      String?
+  documents     Document[]
+  contracts     Contract[]
+  createdAt     DateTime       @default(now())
+}
+
+model Document {
+  id          String         @id @default(cuid())
+  caregiverId String
+  caregiver   Caregiver      @relation(fields: [caregiverId], references: [id])
+  type        DocumentType
+  fileUrl     String
+  status      DocumentStatus @default(PENDING)
+  expiresAt   DateTime?
+  verifiedAt  DateTime?
+  createdAt   DateTime       @default(now())
+}
+
+model Contract {
+  id          String         @id @default(cuid())
+  familyId    String
+  family      Family         @relation(fields: [familyId], references: [id])
+  caregiverId String
+  caregiver   Caregiver      @relation(fields: [caregiverId], references: [id])
+  seniorId    String
+  senior      Senior         @relation(fields: [seniorId], references: [id])
+  status      ContractStatus @default(ACTIVE)
+  tarif       Float
+  program     String
+  startDate   DateTime
+  endDate     DateTime?
+  checkins    Checkin[]
+  journals    Journal[]
+  payments    Payment[]
+  reviews     Review[]
+  alerts      Alert[]
+  createdAt   DateTime       @default(now())
+}
+
+model Checkin {
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id])
+  type        String
+  lat         Float?
+  lng         Float?
+  createdAt   DateTime @default(now())
+}
+
+model Journal {
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id])
+  text        String
+  aiAnalysis  String?
+  hasFlag     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  contractId      String
+  contract        Contract @relation(fields: [contractId], references: [id])
+  amount          Float
+  commission      Float
+  stripePaymentId String?
+  status          String
+  createdAt       DateTime @default(now())
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  contractId  String
+  contract    Contract @relation(fields: [contractId], references: [id])
+  rating      Int
+  text        String?
+  createdAt   DateTime @default(now())
+}
+
+model Alert {
+  id          String    @id @default(cuid())
+  contractId  String
+  contract    Contract  @relation(fields: [contractId], references: [id])
+  type        AlertType
+  message     String
+  read        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+}
