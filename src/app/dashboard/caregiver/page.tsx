@@ -4,6 +4,30 @@ import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import LogoutButton from '@/components/LogoutButton'
 import CheckinButton from '@/components/CheckinButton'
+import CaregiverActions from '@/components/caregiver/CaregiverActions'
+import JournalButton from '@/components/caregiver/JournalButton'
+
+const DOC_LABELS: Record<string, string> = {
+  CI: 'Carte de identitate',
+  CAZIER: 'Cazier judiciar',
+  CERTIFICAT_ANC: 'Certificat ANC',
+  CPR: 'Certificat CPR',
+  ALTELE: 'Alt document',
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  PENDING: 'bg-amber-100 text-amber-700',
+  VERIFIED: 'bg-emerald-100 text-emerald-700',
+  EXPIRED: 'bg-orange-100 text-orange-700',
+  REJECTED: 'bg-red-100 text-red-700',
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: 'In verificare',
+  VERIFIED: 'Verificat',
+  EXPIRED: 'Expirat',
+  REJECTED: 'Respins',
+}
 
 export default async function CaregiverDashboard() {
   const cookieStore = await cookies()
@@ -15,6 +39,7 @@ export default async function CaregiverDashboard() {
   const caregiver = await prisma.caregiver.findUnique({
     where: { userId: payload.sub },
     include: {
+      documents: { orderBy: { createdAt: 'desc' } },
       contracts: {
         where: { status: 'ACTIVE' },
         include: {
@@ -35,6 +60,16 @@ export default async function CaregiverDashboard() {
     )
   ) ?? []
 
+  const profileData = {
+    nume: caregiver?.nume || '',
+    phone: caregiver?.phone || '',
+    judet: caregiver?.judet || '',
+    bio: caregiver?.bio || '',
+    tarif: caregiver?.tarif ?? 0,
+    experienta: caregiver?.experienta ?? 0,
+    disponibil: caregiver?.disponibil ?? true,
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4">
@@ -51,16 +86,19 @@ export default async function CaregiverDashboard() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard Ingrijitor</h1>
-          <p className="text-gray-500 text-sm mt-1">
-            {caregiver?.disponibil ? (
-              <span className="text-emerald-600 font-medium">Disponibil</span>
-            ) : (
-              <span className="text-red-500 font-medium">Indisponibil</span>
-            )}{' '}
-            &bull; {caregiver?.judet}
-          </p>
+        <div className="flex items-start justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard Ingrijitor</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {caregiver?.disponibil ? (
+                <span className="text-emerald-600 font-medium">Disponibil</span>
+              ) : (
+                <span className="text-red-500 font-medium">Indisponibil</span>
+              )}{' '}
+              {caregiver?.judet && <span>&bull; {caregiver.judet}</span>}
+            </p>
+          </div>
+          <CaregiverActions profile={profileData} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -89,7 +127,10 @@ export default async function CaregiverDashboard() {
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">Program: {contract.program}</p>
                     </div>
-                    <CheckinButton contractId={contract.id} />
+                    <div className="flex items-center gap-2">
+                      <JournalButton contractId={contract.id} seniorNume={contract.senior.nume} />
+                      <CheckinButton contractId={contract.id} />
+                    </div>
                   </div>
 
                   {contract.checkins.length > 0 && (
@@ -122,11 +163,58 @@ export default async function CaregiverDashboard() {
                       <div className="bg-gray-50 rounded-lg p-3 text-sm text-gray-600">
                         {contract.journals[0].text}
                         {contract.journals[0].hasFlag && (
-                          <span className="ml-2 text-amber-600 font-medium text-xs">⚠ Semnalat</span>
+                          <span className="ml-2 text-amber-600 font-medium text-xs">&#9888; Semnalat</span>
                         )}
                       </div>
                     </div>
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Documente</h2>
+          {!caregiver?.documents.length ? (
+            <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center">
+              <div className="text-3xl mb-3">📄</div>
+              <p className="font-medium text-gray-700">Niciun document adaugat</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Adauga CI, cazier si certificatele pentru a fi verificat si acceptat de familii.
+              </p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-100">
+              {caregiver.documents.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between px-5 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {DOC_LABELS[doc.type] ?? doc.type}
+                    </p>
+                    {doc.expiresAt && (
+                      <p className="text-xs text-gray-400">
+                        Expira: {new Date(doc.expiresAt).toLocaleDateString('ro-RO')}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <a
+                      href={doc.fileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:underline"
+                    >
+                      Vezi
+                    </a>
+                    <span
+                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                        STATUS_STYLES[doc.status] ?? 'bg-gray-100 text-gray-600'
+                      }`}
+                    >
+                      {STATUS_LABELS[doc.status] ?? doc.status}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>

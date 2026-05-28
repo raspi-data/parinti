@@ -3,6 +3,8 @@ import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import LogoutButton from '@/components/LogoutButton'
+import FamilyActions from '@/components/family/FamilyActions'
+import MarkAlertReadButton from '@/components/family/MarkAlertReadButton'
 
 export default async function FamilyDashboard() {
   const cookieStore = await cookies()
@@ -59,8 +61,9 @@ export default async function FamilyDashboard() {
             <div className="space-y-2">
               {unreadAlerts.map((alert) => (
                 <div key={alert.id} className="flex items-start gap-2 text-sm text-amber-700">
-                  <span className="mt-0.5">⚠</span>
-                  <span>{alert.message}</span>
+                  <span className="mt-0.5">&#9888;</span>
+                  <span className="flex-1">{alert.message}</span>
+                  <MarkAlertReadButton alertId={alert.id} />
                 </div>
               ))}
             </div>
@@ -116,9 +119,21 @@ export default async function FamilyDashboard() {
         </section>
 
         <section>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Seniori</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Seniori</h2>
+            <FamilyActions />
+          </div>
           {!family?.seniors.length ? (
-            <EmptyState icon="👴" title="Niciun senior adaugat" desc="Adauga profilul seniorului pentru a cauta ingrijitori." />
+            <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center">
+              <div className="text-3xl mb-3">👴</div>
+              <p className="font-medium text-gray-700">Niciun senior adaugat</p>
+              <p className="text-sm text-gray-400 mt-1">
+                Adauga profilul seniorului pentru a cauta ingrijitori.
+              </p>
+              <div className="mt-4">
+                <FamilyActions />
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {family.seniors.map((s) => (
@@ -126,6 +141,9 @@ export default async function FamilyDashboard() {
                   <p className="font-medium text-gray-900">{s.nume}</p>
                   <p className="text-sm text-gray-500">{s.varsta} ani &bull; {s.judet}</p>
                   <p className="text-xs text-gray-400 mt-1">{s.nevoi}</p>
+                  {s.conditii && (
+                    <p className="text-xs text-gray-400 mt-0.5">Conditii: {s.conditii}</p>
+                  )}
                 </div>
               ))}
             </div>
