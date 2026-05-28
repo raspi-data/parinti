@@ -6,6 +6,7 @@ import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import FamilyActions from '@/components/family/FamilyActions'
 import MarkAlertReadButton from '@/components/family/MarkAlertReadButton'
+import TosModal from '@/components/family/TosModal'
 
 const REQ_STATUS: Record<string, { label: string; cls: string }> = {
   PENDING:  { label: 'În așteptare', cls: 'bg-amber-100 text-amber-700' },
@@ -31,7 +32,8 @@ export default async function FamilyDashboard() {
           caregiver: true,
           senior: true,
           alerts: { where: { read: false }, orderBy: { createdAt: 'desc' }, take: 5 },
-          checkins: { orderBy: { createdAt: 'desc' }, take: 1 },
+          checkins: { orderBy: { createdAt: 'desc' }, take: 7 },
+          journals: { orderBy: { createdAt: 'desc' }, take: 5 },
         },
         orderBy: { createdAt: 'desc' },
       },
@@ -43,12 +45,19 @@ export default async function FamilyDashboard() {
     },
   })
 
+  const hasActiveContract = (family?.contracts.length ?? 0) > 0
+  const needsTos = hasActiveContract && !family?.acceptedToS
+
   const unreadAlerts = family?.contracts.flatMap((c) => c.alerts) ?? []
   const requests = family?.requests ?? []
   const pendingCount = requests.filter((r) => r.status === 'PENDING').length
 
+  const todayStr = new Date().toDateString()
+
   return (
     <div className="min-h-screen bg-gray-50">
+      {needsTos && <TosModal />}
+
       <header className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -147,30 +156,117 @@ export default async function FamilyDashboard() {
               </Link>
             </div>
           ) : (
-            <div className="space-y-4">
-              {family.contracts.map((contract) => (
-                <div key={contract.id} className="bg-white rounded-xl border border-gray-200 p-5">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-medium text-gray-900">{contract.caregiver.nume}</p>
-                      <p className="text-sm text-gray-500">
-                        Senior: {contract.senior.nume} &bull; {contract.tarif} RON/zi
-                      </p>
+            <div className="space-y-6">
+              {family.contracts.map((contract) => {
+                const checkins = contract.checkins
+                const journals = contract.journals
+
+                const todayCheckins = checkins.filter(
+                  (ch) => new Date(ch.createdAt).toDateString() === todayStr,
+                )
+                const lastCheckinToday = todayCheckins[0]
+
+                const flaggedJournals = journals.filter((j) => j.hasFlag)
+
+                return (
+                  <div key={contract.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
+                    {/* Contract header */}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">{contract.caregiver.nume}</p>
+                        <p className="text-sm text-gray-500">
+                          Senior: {contract.senior.nume} &bull; {contract.tarif} RON/zi
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">Program: {contract.program}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-medium">Activ</span>
+                        <a
+                          href={`/api/contracts/${contract.id}/pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 font-medium transition-colors"
+                        >
+                          📄 Vezi contractul
+                        </a>
+                      </div>
                     </div>
-                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full font-medium">Activ</span>
+
+                    {/* Check-in activity */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Activitate recentă</p>
+                        {lastCheckinToday ? (
+                          <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">
+                            ✓ Prezent azi &mdash; {new Date(lastCheckinToday.createdAt).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">
+                            ⚠ Niciun check-in astăzi
+                          </span>
+                        )}
+                      </div>
+
+                      {checkins.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">Niciun check-in înregistrat încă.</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {checkins.map((ch) => (
+                            <div key={ch.id} className="flex items-center gap-3 text-xs text-gray-600">
+                              <span className={`w-2 h-2 rounded-full shrink-0 ${ch.type === 'IN' ? 'bg-emerald-500' : 'bg-orange-400'}`} />
+                              <span className={`font-medium w-14 ${ch.type === 'IN' ? 'text-emerald-700' : 'text-orange-600'}`}>
+                                {ch.type === 'IN' ? 'Intrare' : 'Ieșire'}
+                              </span>
+                              <span className="text-gray-400">
+                                {new Date(ch.createdAt).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                {' '}
+                                {new Date(ch.createdAt).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Journal */}
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Jurnal îngrijitor</p>
+
+                      {flaggedJournals.length > 0 && (
+                        <div className="mb-3 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-start gap-2">
+                          <span className="text-red-500 mt-0.5">&#9888;</span>
+                          <p className="text-sm text-red-700 font-medium">
+                            Atenție: îngrijitorul a raportat ceva important ({flaggedJournals.length} semnal{flaggedJournals.length !== 1 ? 'e' : ''})
+                          </p>
+                        </div>
+                      )}
+
+                      {journals.length === 0 ? (
+                        <p className="text-xs text-gray-400 italic">Nicio intrare de jurnal încă.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {journals.map((j) => (
+                            <div
+                              key={j.id}
+                              className={`rounded-lg px-4 py-3 text-sm ${j.hasFlag ? 'bg-red-50 border border-red-100' : 'bg-gray-50'}`}
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-xs text-gray-400">
+                                  {new Date(j.createdAt).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                </span>
+                                {j.hasFlag && (
+                                  <span className="text-xs font-medium text-red-600">&#9888; Semnalat</span>
+                                )}
+                              </div>
+                              <p className="text-gray-700">{j.text}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-400">
-                    Județ: {contract.caregiver.judet} &bull; Program: {contract.program}
-                    {contract.checkins[0] && (
-                      <span> &bull; Ultim check-in: {new Date(contract.checkins[0].createdAt).toLocaleDateString('ro-RO')}</span>
-                    )}
-                  </div>
-                  <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2">
-                    <p className="text-xs text-emerald-600 mb-0.5">Contact direct</p>
-                    <p className="font-bold text-emerald-800">{contract.caregiver.phone}</p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </section>

@@ -59,17 +59,19 @@ model User {
 }
 
 model Family {
-  id        String           @id @default(cuid())
-  userId    String           @unique
-  user      User             @relation(fields: [userId], references: [id])
-  phone     String?
-  judet     String
-  stripeId  String?
-  plan      String           @default("basic")
-  seniors   Senior[]
-  contracts Contract[]
-  requests  ContactRequest[]
-  createdAt DateTime         @default(now())
+  id          String           @id @default(cuid())
+  userId      String           @unique
+  user        User             @relation(fields: [userId], references: [id])
+  phone       String?
+  judet       String
+  stripeId    String?
+  plan        String           @default("basic")
+  acceptedToS Boolean          @default(false)
+  acceptedAt  DateTime?
+  seniors     Senior[]
+  contracts   Contract[]
+  requests    ContactRequest[]
+  createdAt   DateTime         @default(now())
 }
 
 model Senior {
