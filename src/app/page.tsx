@@ -1,6 +1,22 @@
+import { cookies } from 'next/headers'
 import Link from 'next/link'
+import { verifyToken } from '@/lib/auth'
+import LogoutButton from '@/components/LogoutButton'
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const cookieStore = await cookies()
+  const token = cookieStore.get('token')?.value
+  const payload = token ? await verifyToken(token) : null
+
+  const dashboardHref =
+    payload?.role === 'FAMILY'
+      ? '/dashboard/family'
+      : payload?.role === 'CAREGIVER'
+        ? '/dashboard/caregiver'
+        : payload?.role === 'ADMIN'
+          ? '/admin'
+          : '/login'
+
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-gray-100 px-6 py-4 flex items-center justify-between max-w-6xl mx-auto">
@@ -8,19 +24,34 @@ export default function LandingPage() {
           <span className="text-2xl font-bold text-blue-600">parinti</span>
           <span className="text-2xl font-bold text-gray-400">.care</span>
         </div>
-        <div className="flex gap-3">
-          <Link
-            href="/login"
-            className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
-          >
-            Intră în cont
-          </Link>
-          <Link
-            href="/register"
-            className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Înregistrare
-          </Link>
+        <div className="flex items-center gap-3">
+          {payload ? (
+            <>
+              <span className="text-sm text-gray-400 hidden sm:block">{payload.email}</span>
+              <Link
+                href={dashboardHref}
+                className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                Dashboard
+              </Link>
+              <LogoutButton />
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+              >
+                Intră în cont
+              </Link>
+              <Link
+                href="/register"
+                className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Înregistrare
+              </Link>
+            </>
+          )}
         </div>
       </header>
 
@@ -41,17 +72,19 @@ export default function LandingPage() {
 
         <div className="flex gap-4 justify-center mb-20 flex-wrap">
           <Link
-            href="/register"
+            href={payload?.role === 'FAMILY' ? '/dashboard/family' : payload ? dashboardHref : '/register'}
             className="px-8 py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors shadow-sm"
           >
-            Cauta un ingrijitor
+            {payload ? 'Mergi la Dashboard' : 'Cauta un ingrijitor'}
           </Link>
-          <Link
-            href="/register"
-            className="px-8 py-4 bg-white text-gray-700 rounded-xl font-semibold text-lg hover:bg-gray-50 transition-colors border border-gray-200"
-          >
-            Sunt ingrijitor
-          </Link>
+          {!payload && (
+            <Link
+              href="/register"
+              className="px-8 py-4 bg-white text-gray-700 rounded-xl font-semibold text-lg hover:bg-gray-50 transition-colors border border-gray-200"
+            >
+              Sunt ingrijitor
+            </Link>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
