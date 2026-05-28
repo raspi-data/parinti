@@ -89,6 +89,7 @@ model Caregiver {
   bio           String?
   tarif         Float
   disponibil    Boolean        @default(true)
+  slug          String?        @unique
   stripeId      String?
   documents     Document[]
   contracts     Contract[]

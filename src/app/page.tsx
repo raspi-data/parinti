@@ -72,7 +72,7 @@ export default async function LandingPage() {
 
         <div className="flex gap-4 justify-center mb-20 flex-wrap">
           <Link
-            href={payload?.role === 'FAMILY' ? '/caregivers' : payload ? dashboardHref : '/register'}
+            href={payload?.role === 'FAMILY' ? '/ingrijitori' : payload ? dashboardHref : '/register'}
             className="px-8 py-4 bg-blue-600 text-white rounded-xl font-semibold text-lg hover:bg-blue-700 transition-colors shadow-sm"
           >
             {payload?.role === 'FAMILY' ? 'Cauta un ingrijitor' : payload ? 'Mergi la Dashboard' : 'Cauta un ingrijitor'}

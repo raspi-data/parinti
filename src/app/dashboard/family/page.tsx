@@ -43,7 +43,7 @@ export default async function FamilyDashboard() {
           </div>
           <div className="flex items-center gap-4">
             <Link
-              href="/caregivers"
+              href="/ingrijitori"
               className="text-sm font-medium text-blue-600 hover:text-blue-700"
             >
               Cauta Ingrijitor
@@ -95,7 +95,7 @@ export default async function FamilyDashboard() {
               <p className="font-medium text-gray-700">Niciun contract activ</p>
               <p className="text-sm text-gray-400 mt-1 mb-4">Cauta un ingrijitor disponibil in zona ta.</p>
               <Link
-                href="/caregivers"
+                href="/ingrijitori"
                 className="inline-block bg-blue-600 text-white rounded-lg px-6 py-2 text-sm font-medium hover:bg-blue-700"
               >
                 Cauta Ingrijitor
