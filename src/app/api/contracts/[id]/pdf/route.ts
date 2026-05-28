@@ -4,6 +4,25 @@ import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
+// Helvetica (WinAnsi) does not support Romanian diacritics — strip them
+function s(text: string): string {
+  return text
+    .replace(/[ăĂ]/g, 'a')
+    .replace(/[âÂ]/g, 'a')
+    .replace(/[îÎ]/g, 'i')
+    .replace(/[șȘşŞ]/g, 's')
+    .replace(/[țȚţŢ]/g, 't')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+}
+
+function fmtDate(d: Date): string {
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}.${mm}.${yyyy}`
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -28,7 +47,7 @@ export async function GET(
   })
 
   if (!contract || contract.family.userId !== payload.sub) {
-    return NextResponse.json({ error: 'Contract negăsit' }, { status: 404 })
+    return NextResponse.json({ error: 'Contract negasit' }, { status: 404 })
   }
 
   const pdf = await PDFDocument.create()
@@ -47,15 +66,18 @@ export async function GET(
   // Header bar
   page.drawRectangle({ x: 0, y: height - 80, width, height: 80, color: blue })
   page.drawText('parinti.care', { x: 40, y: height - 52, size: 22, font: fontBold, color: rgb(1, 1, 1) })
-  page.drawText('CONTRACT DE ÎNGRIJIRE LA DOMICILIU', {
+  page.drawText('CONTRACT DE INGRIJIRE LA DOMICILIU', {
     x: 40, y: height - 72, size: 9, font: fontNormal, color: rgb(0.8, 0.8, 1),
   })
 
   y = height - 110
 
   const line = (label: string, value: string, indent = 40) => {
+    // Truncate long values to avoid overflow
+    const maxChars = 55
+    const safeVal = value.length > maxChars ? value.slice(0, maxChars) + '...' : value
     page.drawText(label, { x: indent, y, size: 10, font: fontBold, color: gray })
-    page.drawText(value, { x: indent + 160, y, size: 10, font: fontNormal, color: black })
+    page.drawText(safeVal, { x: indent + 160, y, size: 10, font: fontNormal, color: black })
     y -= 20
   }
 
@@ -67,24 +89,24 @@ export async function GET(
   }
 
   // ── Parties ──────────────────────────────────────────────────────
-  section('PĂRȚI CONTRACTANTE')
+  section('PARTI CONTRACTANTE')
   line('Familie (beneficiar):', contract.family.user.email)
-  line('Județ familie:', contract.family.judet)
-  line('Îngrijitor (prestator):', contract.caregiver.nume)
-  line('Telefon îngrijitor:', contract.caregiver.phone)
-  line('Județ îngrijitor:', contract.caregiver.judet)
+  line('Judet familie:', s(contract.family.judet))
+  line('Ingrijitor (prestator):', s(contract.caregiver.nume))
+  line('Telefon ingrijitor:', contract.caregiver.phone)
+  line('Judet ingrijitor:', s(contract.caregiver.judet))
 
   // ── Senior ───────────────────────────────────────────────────────
-  section('PERSOANA ÎNGRIJITĂ (SENIOR)')
-  line('Nume:', contract.senior.nume)
-  line('Vârstă:', `${contract.senior.varsta} ani`)
-  line('Județ:', contract.senior.judet)
-  if (contract.senior.nevoi) line('Nevoi speciale:', contract.senior.nevoi)
+  section('PERSOANA INGRIJITA (SENIOR)')
+  line('Nume:', s(contract.senior.nume))
+  line('Varsta:', `${contract.senior.varsta} ani`)
+  line('Judet:', s(contract.senior.judet))
+  if (contract.senior.nevoi) line('Nevoi speciale:', s(contract.senior.nevoi))
 
   // ── Contract details ─────────────────────────────────────────────
   section('DETALII CONTRACT')
-  line('Program:', contract.program)
-  line('Data de start:', new Date(contract.startDate).toLocaleDateString('ro-RO'))
+  line('Program:', s(contract.program))
+  line('Data de start:', fmtDate(new Date(contract.startDate)))
   line('Tarif zilnic:', `${contract.tarif} RON/zi`)
   line('Status:', contract.status)
   line('Nr. contract:', contract.id.slice(0, 8).toUpperCase())
@@ -94,13 +116,13 @@ export async function GET(
 
   const clauses = [
     '1. Reziliere: oricare parte poate rezilia contractul cu 7 zile preaviz scris.',
-    '2. Confidențialitate: îngrijitorul se obligă să păstreze confidențialitatea datelor medicale',
-    '   și personale ale seniorului și familiei.',
-    '3. Responsabilitate: prestatorul răspunde pentru calitatea serviciilor prestate conform',
-    '   programului convenit.',
-    '4. Plată: tarifele se achită conform programului agreat, prin mijloacele convenite.',
-    '5. Modificări: orice modificare a prezentului contract se face prin acordul scris al ambelor',
-    '   părți, prin intermediul platformei parinti.care.',
+    '2. Confidentialitate: ingrijitorul se obliga sa pastreze confidentialitatea',
+    '   datelor medicale si personale ale seniorului si familiei.',
+    '3. Responsabilitate: prestatorul raspunde pentru calitatea serviciilor prestate',
+    '   conform programului convenit.',
+    '4. Plata: tarifele se achita conform programului agreat, prin mijloacele convenite.',
+    '5. Modificari: orice modificare se face prin acordul scris al ambelor parti,',
+    '   prin intermediul platformei parinti.care.',
   ]
 
   for (const clause of clauses) {
@@ -113,12 +135,12 @@ export async function GET(
   page.drawLine({ start: { x: 42, y }, end: { x: 220, y }, thickness: 1, color: gray })
   page.drawLine({ start: { x: 340, y }, end: { x: 550, y }, thickness: 1, color: gray })
   y -= 18
-  page.drawText('Semnătura Familie', { x: 80, y, size: 9, font: fontNormal, color: gray })
-  page.drawText('Semnătura Îngrijitor', { x: 370, y, size: 9, font: fontNormal, color: gray })
+  page.drawText('Semnatura Familie', { x: 80, y, size: 9, font: fontNormal, color: gray })
+  page.drawText('Semnatura Ingrijitor', { x: 365, y, size: 9, font: fontNormal, color: gray })
 
   // ── Footer ───────────────────────────────────────────────────────
   page.drawText(
-    `Generat automat pe parinti.care · ${new Date().toLocaleDateString('ro-RO')}`,
+    `Generat automat pe parinti.care  |  ${fmtDate(new Date())}`,
     { x: 40, y: 28, size: 8, font: fontNormal, color: gray },
   )
 
