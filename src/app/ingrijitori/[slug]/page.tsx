@@ -6,7 +6,7 @@ import type { Metadata } from 'next'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import LogoutButton from '@/components/LogoutButton'
-import SolicitaButton from '@/components/SolicitaButton'
+import SolicitaForm from './SolicitaForm'
 
 const DOC_BADGE: Record<string, string> = {
   CI: 'CI verificat',
@@ -36,7 +36,6 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params
   const c = await getCaregiver(slug)
   if (!c) return { title: 'Îngrijitor | Parinti.care' }
-
   return {
     title: `Îngrijitor ${c.nume} - ${c.judet} | Parinti.care`,
     description: c.bio
@@ -61,13 +60,28 @@ export default async function CaregiverProfilePage({ params }: PageProps) {
     : null
 
   let showPhone = false
+  let familySeniors: Array<{ id: string; nume: string; varsta: number }> = []
+  let hasPendingRequest = false
+
   if (payload?.role === 'FAMILY') {
-    const family = await prisma.family.findUnique({ where: { userId: payload.sub } })
+    const family = await prisma.family.findUnique({
+      where: { userId: payload.sub },
+      include: {
+        seniors: { select: { id: true, nume: true, varsta: true } },
+        contracts: {
+          where: { caregiverId: caregiver.id, status: 'ACTIVE' },
+          take: 1,
+        },
+        requests: {
+          where: { caregiverId: caregiver.id, status: 'PENDING' },
+          take: 1,
+        },
+      },
+    })
     if (family) {
-      const activeContract = await prisma.contract.findFirst({
-        where: { familyId: family.id, caregiverId: caregiver.id, status: 'ACTIVE' },
-      })
-      showPhone = !!activeContract
+      showPhone = family.contracts.length > 0
+      familySeniors = family.seniors
+      hasPendingRequest = family.requests.length > 0
     }
   }
 
@@ -110,12 +124,11 @@ export default async function CaregiverProfilePage({ params }: PageProps) {
       <main className="max-w-3xl mx-auto px-6 py-8">
         <div className="mb-4">
           <Link href="/ingrijitori" className="text-sm text-blue-600 hover:underline">
-            ← Înapoi la lista
+            ← Înapoi la listă
           </Link>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-          {/* Hero */}
           <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-8 py-10 text-white">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div>
@@ -137,28 +150,19 @@ export default async function CaregiverProfilePage({ params }: PageProps) {
           </div>
 
           <div className="p-8 space-y-8">
-            {/* Bio */}
             {caregiver.bio && (
               <section>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Despre mine
-                </h2>
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Despre mine</h2>
                 <p className="text-gray-700 leading-relaxed">{caregiver.bio}</p>
               </section>
             )}
 
-            {/* Verified documents */}
             {caregiver.documents.length > 0 && (
               <section>
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                  Documente verificate
-                </h2>
+                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Documente verificate</h2>
                 <div className="flex flex-wrap gap-2">
                   {caregiver.documents.map((d) => (
-                    <span
-                      key={d.type}
-                      className="flex items-center gap-1.5 text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full font-medium"
-                    >
+                    <span key={d.type} className="flex items-center gap-1.5 text-sm bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-full font-medium">
                       <span className="text-emerald-500">✓</span>
                       {DOC_BADGE[d.type] ?? d.type}
                     </span>
@@ -167,7 +171,6 @@ export default async function CaregiverProfilePage({ params }: PageProps) {
               </section>
             )}
 
-            {/* Rating & reviews */}
             {allReviews.length > 0 && (
               <section>
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -178,12 +181,7 @@ export default async function CaregiverProfilePage({ params }: PageProps) {
                   <div>
                     <div className="flex gap-0.5">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <span
-                          key={star}
-                          className={avgRating && avgRating >= star ? 'text-amber-400' : 'text-gray-200'}
-                        >
-                          ★
-                        </span>
+                        <span key={star} className={avgRating && avgRating >= star ? 'text-amber-400' : 'text-gray-200'}>★</span>
                       ))}
                     </div>
                     <p className="text-xs text-gray-400">{allReviews.length} recenzii</p>
@@ -194,9 +192,7 @@ export default async function CaregiverProfilePage({ params }: PageProps) {
                     <div key={i} className="bg-gray-50 rounded-xl p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-amber-400">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
-                        <span className="text-xs text-gray-400">
-                          {new Date(r.createdAt).toLocaleDateString('ro-RO')}
-                        </span>
+                        <span className="text-xs text-gray-400">{new Date(r.createdAt).toLocaleDateString('ro-RO')}</span>
                       </div>
                       {r.text && <p className="text-sm text-gray-600">{r.text}</p>}
                     </div>
@@ -205,32 +201,40 @@ export default async function CaregiverProfilePage({ params }: PageProps) {
               </section>
             )}
 
-            {/* Contact / Solicita */}
             <section className="pt-4 border-t border-gray-100">
               {showPhone ? (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5">
                   <p className="text-sm font-medium text-emerald-800 mb-1">Contact direct (contract activ)</p>
                   <p className="text-2xl font-bold text-emerald-700">{caregiver.phone}</p>
                 </div>
+              ) : hasPendingRequest ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 text-center">
+                  <p className="font-medium text-blue-800">Cerere trimisă — în așteptarea răspunsului</p>
+                  <p className="text-sm text-blue-600 mt-1">Vei primi un email imediat ce îngrijitorul răspunde.</p>
+                </div>
+              ) : payload?.role === 'FAMILY' ? (
+                <div className="space-y-3">
+                  <SolicitaForm
+                    caregiverId={caregiver.id}
+                    caregiverNume={caregiver.nume}
+                    seniors={familySeniors}
+                  />
+                  <p className="text-xs text-center text-gray-400">
+                    Numărul de telefon devine vizibil după semnarea contractului.
+                  </p>
+                </div>
               ) : (
                 <div className="space-y-3">
-                  <SolicitaButton
-                    isLoggedInFamily={payload?.role === 'FAMILY'}
-                    caregiverNume={caregiver.nume}
-                  />
-                  {!payload && (
-                    <p className="text-xs text-center text-gray-400">
-                      Ai deja cont?{' '}
-                      <Link href="/login" className="text-blue-600 hover:underline">
-                        Intră în cont
-                      </Link>
-                    </p>
-                  )}
-                  {payload?.role === 'FAMILY' && (
-                    <p className="text-xs text-center text-gray-400">
-                      Numărul de telefon devine vizibil după semnarea contractului.
-                    </p>
-                  )}
+                  <Link
+                    href="/register"
+                    className="block w-full text-center bg-blue-600 text-white rounded-xl py-3 font-semibold hover:bg-blue-700"
+                  >
+                    Solicită îngrijitor
+                  </Link>
+                  <p className="text-xs text-center text-gray-400">
+                    Ai deja cont?{' '}
+                    <Link href="/login" className="text-blue-600 hover:underline">Intră în cont</Link>
+                  </p>
                 </div>
               )}
             </section>

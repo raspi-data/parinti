@@ -40,60 +40,69 @@ enum AlertType {
   JOURNAL_ANOMALY
 }
 
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
+  id            String     @id @default(cuid())
+  email         String     @unique
   password      String
   role          Role
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
   family        Family?
   caregiver     Caregiver?
 }
 
 model Family {
-  id          String     @id @default(cuid())
-  userId      String     @unique
-  user        User       @relation(fields: [userId], references: [id])
-  phone       String?
-  judet       String
-  stripeId    String?
-  plan        String     @default("basic")
-  seniors     Senior[]
-  contracts   Contract[]
-  createdAt   DateTime   @default(now())
+  id        String           @id @default(cuid())
+  userId    String           @unique
+  user      User             @relation(fields: [userId], references: [id])
+  phone     String?
+  judet     String
+  stripeId  String?
+  plan      String           @default("basic")
+  seniors   Senior[]
+  contracts Contract[]
+  requests  ContactRequest[]
+  createdAt DateTime         @default(now())
 }
 
 model Senior {
-  id          String     @id @default(cuid())
-  familyId    String
-  family      Family     @relation(fields: [familyId], references: [id])
-  nume        String
-  varsta      Int
-  judet       String
-  adresa      String
-  nevoi       String
-  conditii    String?
-  contracts   Contract[]
-  createdAt   DateTime   @default(now())
+  id        String     @id @default(cuid())
+  familyId  String
+  family    Family     @relation(fields: [familyId], references: [id])
+  nume      String
+  varsta    Int
+  judet     String
+  adresa    String
+  nevoi     String
+  conditii  String?
+  contracts Contract[]
+  createdAt DateTime   @default(now())
 }
 
 model Caregiver {
-  id            String         @id @default(cuid())
-  userId        String         @unique
-  user          User           @relation(fields: [userId], references: [id])
-  nume          String
-  phone         String
-  judet         String
-  experienta    Int
-  bio           String?
-  tarif         Float
-  disponibil    Boolean        @default(true)
-  slug          String?        @unique
-  stripeId      String?
-  documents     Document[]
-  contracts     Contract[]
-  createdAt     DateTime       @default(now())
+  id         String           @id @default(cuid())
+  userId     String           @unique
+  user       User             @relation(fields: [userId], references: [id])
+  nume       String
+  phone      String
+  judet      String
+  experienta Int
+  bio        String?
+  tarif      Float
+  disponibil Boolean          @default(true)
+  slug       String?          @unique
+  stripeId   String?
+  documents  Document[]
+  contracts  Contract[]
+  requests   ContactRequest[]
+  createdAt  DateTime         @default(now())
 }
 
 model Document {
@@ -126,27 +135,47 @@ model Contract {
   payments    Payment[]
   reviews     Review[]
   alerts      Alert[]
+  request     ContactRequest?
   createdAt   DateTime       @default(now())
 }
 
+model ContactRequest {
+  id          String        @id @default(cuid())
+  familyId    String
+  family      Family        @relation(fields: [familyId], references: [id])
+  caregiverId String
+  caregiver   Caregiver     @relation(fields: [caregiverId], references: [id])
+  seniorName  String
+  seniorAge   Int
+  program     String
+  startDate   DateTime
+  message     String?
+  status      RequestStatus @default(PENDING)
+  expiresAt   DateTime
+  contractId  String?       @unique
+  contract    Contract?     @relation(fields: [contractId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
 model Checkin {
-  id          String   @id @default(cuid())
-  contractId  String
-  contract    Contract @relation(fields: [contractId], references: [id])
-  type        String
-  lat         Float?
-  lng         Float?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id])
+  type       String
+  lat        Float?
+  lng        Float?
+  createdAt  DateTime @default(now())
 }
 
 model Journal {
-  id          String   @id @default(cuid())
-  contractId  String
-  contract    Contract @relation(fields: [contractId], references: [id])
-  text        String
-  aiAnalysis  String?
-  hasFlag     Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id])
+  text       String
+  aiAnalysis String?
+  hasFlag    Boolean  @default(false)
+  createdAt  DateTime @default(now())
 }
 
 model Payment {
@@ -161,20 +190,20 @@ model Payment {
 }
 
 model Review {
-  id          String   @id @default(cuid())
-  contractId  String
-  contract    Contract @relation(fields: [contractId], references: [id])
-  rating      Int
-  text        String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  contractId String
+  contract   Contract @relation(fields: [contractId], references: [id])
+  rating     Int
+  text       String?
+  createdAt  DateTime @default(now())
 }
 
 model Alert {
-  id          String    @id @default(cuid())
-  contractId  String
-  contract    Contract  @relation(fields: [contractId], references: [id])
-  type        AlertType
-  message     String
-  read        Boolean   @default(false)
-  createdAt   DateTime  @default(now())
+  id         String    @id @default(cuid())
+  contractId String
+  contract   Contract  @relation(fields: [contractId], references: [id])
+  type       AlertType
+  message    String
+  read       Boolean   @default(false)
+  createdAt  DateTime  @default(now())
 }
