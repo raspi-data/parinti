@@ -18,7 +18,7 @@ export default async function CaregiverDashboard() {
       contracts: {
         where: { status: 'ACTIVE' },
         include: {
-          family: true,
+          family: { include: { user: true } },
           senior: true,
           checkins: { orderBy: { createdAt: 'desc' }, take: 3 },
           journals: { orderBy: { createdAt: 'desc' }, take: 3 },
@@ -85,7 +85,7 @@ export default async function CaregiverDashboard() {
                     <div>
                       <p className="font-medium text-gray-900">{contract.senior.nume}</p>
                       <p className="text-sm text-gray-500">
-                        Familie: {contract.family.userId} &bull; {contract.tarif} RON/zi
+                        Familie: {contract.family.user.email} &bull; {contract.tarif} RON/zi
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">Program: {contract.program}</p>
                     </div>

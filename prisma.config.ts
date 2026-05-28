@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { defineConfig } from 'prisma/config'
 
-process.loadEnvFile?.()
+try { process.loadEnvFile?.() } catch {}
 
 export default defineConfig({
   schema: path.join('prisma', 'schema.prisma'),
