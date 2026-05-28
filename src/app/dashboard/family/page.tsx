@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import FamilyActions from '@/components/family/FamilyActions'
 import MarkAlertReadButton from '@/components/family/MarkAlertReadButton'
@@ -41,7 +42,13 @@ export default async function FamilyDashboard() {
             <span className="text-xl font-bold text-gray-400">.care</span>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-500">{payload.email}</span>
+            <Link
+              href="/caregivers"
+              className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            >
+              Cauta Ingrijitor
+            </Link>
+            <span className="text-sm text-gray-500 hidden sm:block">{payload.email}</span>
             <LogoutButton />
           </div>
         </div>
@@ -83,11 +90,17 @@ export default async function FamilyDashboard() {
         <section>
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Contracte active</h2>
           {!family?.contracts.length ? (
-            <EmptyState
-              icon="📋"
-              title="Niciun contract activ"
-              desc="Cauta un ingrijitor disponibil in zona ta."
-            />
+            <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center">
+              <div className="text-3xl mb-3">📋</div>
+              <p className="font-medium text-gray-700">Niciun contract activ</p>
+              <p className="text-sm text-gray-400 mt-1 mb-4">Cauta un ingrijitor disponibil in zona ta.</p>
+              <Link
+                href="/caregivers"
+                className="inline-block bg-blue-600 text-white rounded-lg px-6 py-2 text-sm font-medium hover:bg-blue-700"
+              >
+                Cauta Ingrijitor
+              </Link>
+            </div>
           ) : (
             <div className="space-y-4">
               {family.contracts.map((contract) => (
