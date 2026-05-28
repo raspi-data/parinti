@@ -10,7 +10,7 @@ RUN npm ci
 COPY . .
 
 RUN npx prisma generate
-RUN npm run build -- --no-lint
+RUN npm run build
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
