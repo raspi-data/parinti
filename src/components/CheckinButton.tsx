@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-type State = 'idle' | 'locating' | 'sending' | 'success' | 'error'
+type State = 'idle' | 'locating' | 'sending' | 'success' | 'error' | 'reporting' | 'reported'
 
 interface Result {
   type: 'IN' | 'OUT'
@@ -11,11 +11,19 @@ interface Result {
   message: string
 }
 
+interface GeoErr {
+  message: string
+  distanceM: number
+  contractId: string
+}
+
 export default function CheckinButton({ contractId }: { contractId: string }) {
   const router = useRouter()
-  const [state, setState] = useState<State>('idle')
-  const [result, setResult] = useState<Result | null>(null)
-  const [errMsg, setErrMsg] = useState('')
+  const [state, setState]       = useState<State>('idle')
+  const [result, setResult]     = useState<Result | null>(null)
+  const [errMsg, setErrMsg]     = useState('')
+  const [geoErr, setGeoErr]     = useState<GeoErr | null>(null)
+  const [reporting, setReporting] = useState(false)
 
   async function handleCheckin(type: 'IN' | 'OUT') {
     setState('locating')
@@ -51,6 +59,9 @@ export default function CheckinButton({ contractId }: { contractId: string }) {
       const data = await res.json()
 
       if (!res.ok) {
+        if (data.geofenceError) {
+          setGeoErr({ message: data.error, distanceM: data.distanceM, contractId })
+        }
         setState('error')
         setErrMsg(data.error ?? 'Eroare la înregistrare')
         return
@@ -69,10 +80,23 @@ export default function CheckinButton({ contractId }: { contractId: string }) {
     }
   }
 
+  async function reportGeoIssue() {
+    if (!geoErr) return
+    setReporting(true)
+    await fetch('/api/checkin/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contractId: geoErr.contractId, distanceM: geoErr.distanceM }),
+    })
+    setReporting(false)
+    setState('reported')
+  }
+
   function reset() {
     setState('idle')
     setResult(null)
     setErrMsg('')
+    setGeoErr(null)
   }
 
   if (state === 'locating') {
@@ -112,13 +136,30 @@ export default function CheckinButton({ contractId }: { contractId: string }) {
     )
   }
 
+  if (state === 'reported') {
+    return (
+      <p className="text-xs text-emerald-600 font-medium">✓ Problemă raportată la admin</p>
+    )
+  }
+
   if (state === 'error') {
     return (
-      <div className="space-y-1">
-        <p className="text-sm text-red-600">{errMsg}</p>
-        <button onClick={reset} className="text-xs text-gray-500 hover:text-gray-700 underline">
-          Încearcă din nou
-        </button>
+      <div className="space-y-2">
+        <p className="text-sm text-red-600 font-medium">{errMsg}</p>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={reset} className="text-xs text-gray-500 hover:text-gray-700 underline">
+            Încearcă din nou
+          </button>
+          {geoErr && (
+            <button
+              onClick={reportGeoIssue}
+              disabled={reporting}
+              className="text-xs bg-amber-100 text-amber-700 px-2.5 py-1 rounded-lg hover:bg-amber-200 font-medium"
+            >
+              {reporting ? 'Se trimite...' : 'Raportează problemă de locație'}
+            </button>
+          )}
+        </div>
       </div>
     )
   }

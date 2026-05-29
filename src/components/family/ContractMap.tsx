@@ -77,7 +77,7 @@ export default function ContractMap({ seniorLat, seniorLng, checkinLat, checkinL
       if (seniorLat && seniorLng) {
         // Blue transparent 200m geofence circle
         L.circle([seniorLat, seniorLng], {
-          radius: 200, color: '#2563eb', weight: 2,
+          radius: 300, color: '#2563eb', weight: 2,
           fillColor: '#2563eb', fillOpacity: 0.08,
         }).addTo(map)
 

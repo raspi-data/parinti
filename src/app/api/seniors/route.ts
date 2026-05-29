@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
   const family = await prisma.family.findUnique({ where: { userId: payload.sub } })
   if (!family) return NextResponse.json({ error: 'Profil familie negasit' }, { status: 404 })
 
-  const { nume, varsta, judet, adresa, nevoi, conditii } = await request.json()
+  const { nume, varsta, judet, adresa, nevoi, conditii, lat, lng } = await request.json()
 
   if (!nume || !varsta || !judet || !adresa || !nevoi) {
     return NextResponse.json({ error: 'Completati toate campurile obligatorii' }, { status: 400 })
@@ -31,15 +31,19 @@ export async function POST(request: NextRequest) {
       adresa,
       nevoi,
       conditii: conditii || null,
+      lat: typeof lat === 'number' ? lat : null,
+      lng: typeof lng === 'number' ? lng : null,
     },
   })
 
-  // Geocode async — don't block the response
-  geocodeAddress(adresa, judet).then((coords) => {
-    if (coords) {
-      prisma.senior.update({ where: { id: senior.id }, data: coords }).catch(() => {})
-    }
-  }).catch(() => {})
+  // If client didn't provide coords, try geocoding async
+  if (!lat || !lng) {
+    geocodeAddress(adresa, judet).then((coords) => {
+      if (coords) {
+        prisma.senior.update({ where: { id: senior.id }, data: coords }).catch(() => {})
+      }
+    }).catch(() => {})
+  }
 
   return NextResponse.json(senior, { status: 201 })
 }

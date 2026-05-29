@@ -4,7 +4,7 @@ import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { haversineDistanceM } from '@/lib/geo'
 
-const GEOFENCE_RADIUS_M = 200
+const GEOFENCE_RADIUS_M = 300
 
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies()
@@ -36,7 +36,11 @@ export async function POST(request: NextRequest) {
     distanceM = Math.round(haversineDistanceM(lat, lng, contract.senior.lat, contract.senior.lng))
     if (distanceM > GEOFENCE_RADIUS_M) {
       return NextResponse.json(
-        { error: `Esti prea departe de adresa seniorului (${distanceM}m). Limita: ${GEOFENCE_RADIUS_M}m.`, distanceM },
+        {
+          error: `Ești la ${distanceM} m de adresă, necesari maxim ${GEOFENCE_RADIUS_M} m.`,
+          distanceM,
+          geofenceError: true,
+        },
         { status: 422 },
       )
     }

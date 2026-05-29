@@ -4,6 +4,7 @@ import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import LogoutButton from '@/components/LogoutButton'
 import RequestsSection, { type RequestRow, type Metrics } from './RequestsSection'
+import SenioriSection, { type SeniorRow } from './SenioriSection'
 
 export default async function AdminPanel() {
   const cookieStore = await cookies()
@@ -18,7 +19,7 @@ export default async function AdminPanel() {
   const monthStart = new Date(now); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0)
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86_400_000)
 
-  const [pendingDocs, totalUsers, totalContracts, allRequests] = await Promise.all([
+  const [pendingDocs, totalUsers, totalContracts, allRequests, allSeniors] = await Promise.all([
     prisma.document.findMany({
       where: { status: 'PENDING' },
       include: { caregiver: { include: { user: true } } },
@@ -33,6 +34,10 @@ export default async function AdminPanel() {
         family: { include: { user: true } },
         caregiver: true,
       },
+    }),
+    prisma.senior.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, nume: true, judet: true, adresa: true, varsta: true, lat: true, lng: true },
     }),
   ])
 
@@ -155,6 +160,17 @@ export default async function AdminPanel() {
             flaggedCaregiverIds={flaggedCaregiverIds}
             flaggedFamilyIds={flaggedFamilyIds}
           />
+        </section>
+
+        {/* Senior locations */}
+        <section>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">
+            Locații seniori ({allSeniors.length})
+            <span className="ml-2 text-sm font-normal text-gray-400">
+              — {allSeniors.filter((s) => s.lat).length} geocodați
+            </span>
+          </h2>
+          <SenioriSection seniors={allSeniors as SeniorRow[]} />
         </section>
 
         {/* Pending documents */}
