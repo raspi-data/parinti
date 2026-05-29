@@ -84,6 +84,8 @@ model Senior {
   adresa    String
   nevoi     String
   conditii  String?
+  lat       Float?
+  lng       Float?
   contracts Contract[]
   createdAt DateTime   @default(now())
 }

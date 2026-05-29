@@ -108,6 +108,23 @@ ${opts.alternatives.length ? `<p>Îți recomandăm câțiva îngrijitori disponi
   )
 }
 
+export async function emailMissedCheckin(opts: {
+  familyEmail: string
+  caregiverNume: string
+  seniorNume: string
+  contractId: string
+}) {
+  await send(
+    opts.familyEmail,
+    `Alertă: niciun check-in astăzi — ${opts.seniorNume}`,
+    `<p>Bună ziua,</p>
+<p>Îngrijitorul <strong>${opts.caregiverNume}</strong> nu a efectuat niciun check-in astăzi pentru seniorul <strong>${opts.seniorNume}</strong>.</p>
+<p>Vă rugăm să contactați îngrijitorul pentru a verifica situația.</p>
+<p><a href="${BASE_URL}/dashboard/family" style="display:inline-block;background:#dc2626;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none">Vezi dashboardul</a></p>
+<p style="color:#6b7280;font-size:12px">parinti.care — Alertă automată</p>`,
+  )
+}
+
 export async function emailRequestExpired(opts: { familyEmail: string; caregiverNume: string }) {
   await send(
     opts.familyEmail,

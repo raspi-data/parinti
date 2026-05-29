@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { emailRequestAccepted, emailCaregiverContractCreated } from '@/lib/email'
+import { geocodeAddress } from '@/lib/geo'
 
 export async function POST(
   _req: NextRequest,
@@ -50,6 +51,18 @@ export async function POST(
         nevoi: contactReq.message ?? 'Îngrijire la domiciliu',
       },
     })
+  }
+
+  // Geocode senior address in background (non-blocking if it fails)
+  if (!senior.lat || !senior.lng) {
+    geocodeAddress(senior.adresa, senior.judet).then((coords) => {
+      if (coords) {
+        prisma.senior.update({
+          where: { id: senior!.id },
+          data: { lat: coords.lat, lng: coords.lng },
+        }).catch(() => {})
+      }
+    }).catch(() => {})
   }
 
   const contract = await prisma.contract.create({

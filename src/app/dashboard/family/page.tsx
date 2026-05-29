@@ -7,6 +7,8 @@ import LogoutButton from '@/components/LogoutButton'
 import FamilyActions from '@/components/family/FamilyActions'
 import MarkAlertReadButton from '@/components/family/MarkAlertReadButton'
 import TosModal from '@/components/family/TosModal'
+import ContractMap from '@/components/family/ContractMap'
+import { haversineDistanceM } from '@/lib/geo'
 
 const REQ_STATUS: Record<string, { label: string; cls: string }> = {
   PENDING:  { label: 'În așteptare', cls: 'bg-amber-100 text-amber-700' },
@@ -164,9 +166,23 @@ export default async function FamilyDashboard() {
                 const todayCheckins = checkins.filter(
                   (ch) => new Date(ch.createdAt).toDateString() === todayStr,
                 )
+                // First IN check-in today (checkins are ordered desc, so find last one in array with type IN)
+                const todayInCheckins = todayCheckins.filter((ch) => ch.type === 'IN')
+                const firstInToday = todayInCheckins[todayInCheckins.length - 1] ?? null
                 const lastCheckinToday = todayCheckins[0]
 
                 const flaggedJournals = journals.filter((j) => j.hasFlag)
+
+                // For map: last checkin with GPS coords
+                const lastGpsCheckin = checkins.find((ch) => ch.lat != null && ch.lng != null) ?? null
+                const seniorHasCoords = contract.senior.lat != null && contract.senior.lng != null
+
+                const distanceM = lastGpsCheckin?.lat && lastGpsCheckin?.lng && seniorHasCoords
+                  ? Math.round(haversineDistanceM(
+                      lastGpsCheckin.lat, lastGpsCheckin.lng,
+                      contract.senior.lat!, contract.senior.lng!,
+                    ))
+                  : null
 
                 return (
                   <div key={contract.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
@@ -196,9 +212,9 @@ export default async function FamilyDashboard() {
                     <div>
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Activitate recentă</p>
-                        {lastCheckinToday ? (
+                        {firstInToday ? (
                           <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">
-                            ✓ Prezent azi &mdash; {new Date(lastCheckinToday.createdAt).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                            ✓ Prezent de la {new Date(firstInToday.createdAt).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         ) : (
                           <span className="text-xs font-medium bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">
@@ -227,6 +243,20 @@ export default async function FamilyDashboard() {
                         </div>
                       )}
                     </div>
+
+                    {/* Map */}
+                    {seniorHasCoords && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Locație</p>
+                        <ContractMap
+                          seniorLat={contract.senior.lat!}
+                          seniorLng={contract.senior.lng!}
+                          checkinLat={lastGpsCheckin?.lat ?? null}
+                          checkinLng={lastGpsCheckin?.lng ?? null}
+                          distanceM={distanceM}
+                        />
+                      </div>
+                    )}
 
                     {/* Journal */}
                     <div>
