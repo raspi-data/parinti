@@ -173,16 +173,27 @@ export default async function FamilyDashboard() {
 
                 const flaggedJournals = journals.filter((j) => j.hasFlag)
 
-                // For map: last checkin with GPS coords
+                // Last check-in with GPS coords (for map centre)
                 const lastGpsCheckin = checkins.find((ch) => ch.lat != null && ch.lng != null) ?? null
-                const seniorHasCoords = contract.senior.lat != null && contract.senior.lng != null
+                const seniorLat = contract.senior.lat ?? null
+                const seniorLng = contract.senior.lng ?? null
 
-                const distanceM = lastGpsCheckin?.lat && lastGpsCheckin?.lng && seniorHasCoords
+                const mapDistanceM = lastGpsCheckin?.lat && lastGpsCheckin?.lng && seniorLat && seniorLng
                   ? Math.round(haversineDistanceM(
-                      lastGpsCheckin.lat, lastGpsCheckin.lng,
-                      contract.senior.lat!, contract.senior.lng!,
+                      lastGpsCheckin.lat, lastGpsCheckin.lng, seniorLat, seniorLng,
                     ))
                   : null
+
+                // Per-checkin distances for timeline badges
+                const checkinDistances = new Map<string, number | null>()
+                for (const ch of checkins) {
+                  checkinDistances.set(
+                    ch.id,
+                    ch.lat && ch.lng && seniorLat && seniorLng
+                      ? Math.round(haversineDistanceM(ch.lat, ch.lng, seniorLat, seniorLng))
+                      : null,
+                  )
+                }
 
                 return (
                   <div key={contract.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
@@ -208,9 +219,10 @@ export default async function FamilyDashboard() {
                       </div>
                     </div>
 
-                    {/* Check-in activity */}
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
+                    {/* Check-in activity + map */}
+                    <div className="space-y-3">
+                      {/* Badge row */}
+                      <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Activitate recentă</p>
                         {firstInToday ? (
                           <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">
@@ -223,40 +235,46 @@ export default async function FamilyDashboard() {
                         )}
                       </div>
 
+                      {/* Map — always shown; handles "Locație indisponibilă" internally */}
+                      <ContractMap
+                        seniorLat={seniorLat}
+                        seniorLng={seniorLng}
+                        checkinLat={lastGpsCheckin?.lat ?? null}
+                        checkinLng={lastGpsCheckin?.lng ?? null}
+                        distanceM={mapDistanceM}
+                      />
+
+                      {/* Timeline with distance badges */}
                       {checkins.length === 0 ? (
                         <p className="text-xs text-gray-400 italic">Niciun check-in înregistrat încă.</p>
                       ) : (
-                        <div className="space-y-1">
-                          {checkins.map((ch) => (
-                            <div key={ch.id} className="flex items-center gap-3 text-xs text-gray-600">
-                              <span className={`w-2 h-2 rounded-full shrink-0 ${ch.type === 'IN' ? 'bg-emerald-500' : 'bg-orange-400'}`} />
-                              <span className={`font-medium w-14 ${ch.type === 'IN' ? 'text-emerald-700' : 'text-orange-600'}`}>
-                                {ch.type === 'IN' ? 'Intrare' : 'Ieșire'}
-                              </span>
-                              <span className="text-gray-400">
-                                {new Date(ch.createdAt).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                                {' '}
-                                {new Date(ch.createdAt).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          ))}
+                        <div className="space-y-1.5">
+                          {checkins.map((ch) => {
+                            const dist = checkinDistances.get(ch.id) ?? null
+                            return (
+                              <div key={ch.id} className="flex items-center gap-2 text-xs text-gray-600 flex-wrap">
+                                <span className={`w-2 h-2 rounded-full shrink-0 ${ch.type === 'IN' ? 'bg-emerald-500' : 'bg-orange-400'}`} />
+                                <span className={`font-medium w-12 ${ch.type === 'IN' ? 'text-emerald-700' : 'text-orange-600'}`}>
+                                  {ch.type === 'IN' ? 'Intrare' : 'Ieșire'}
+                                </span>
+                                <span className="text-gray-400">
+                                  {new Date(ch.createdAt).toLocaleDateString('ro-RO', { day: '2-digit', month: '2-digit' })}
+                                  {' '}
+                                  {new Date(ch.createdAt).toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                {dist != null ? (
+                                  <span className={`ml-auto px-2 py-0.5 rounded-full font-medium ${dist <= 200 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                    {dist <= 200 ? `În rază ✓` : `În afara razei ✗`} &mdash; {dist} m
+                                  </span>
+                                ) : (
+                                  <span className="ml-auto text-gray-400">GPS indisponibil</span>
+                                )}
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
-
-                    {/* Map */}
-                    {seniorHasCoords && (
-                      <div>
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Locație</p>
-                        <ContractMap
-                          seniorLat={contract.senior.lat!}
-                          seniorLng={contract.senior.lng!}
-                          checkinLat={lastGpsCheckin?.lat ?? null}
-                          checkinLng={lastGpsCheckin?.lng ?? null}
-                          distanceM={distanceM}
-                        />
-                      </div>
-                    )}
 
                     {/* Journal */}
                     <div>

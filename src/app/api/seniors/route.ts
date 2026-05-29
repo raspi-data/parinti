@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { geocodeAddress } from '@/lib/geo'
 
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies()
@@ -32,6 +33,13 @@ export async function POST(request: NextRequest) {
       conditii: conditii || null,
     },
   })
+
+  // Geocode async — don't block the response
+  geocodeAddress(adresa, judet).then((coords) => {
+    if (coords) {
+      prisma.senior.update({ where: { id: senior.id }, data: coords }).catch(() => {})
+    }
+  }).catch(() => {})
 
   return NextResponse.json(senior, { status: 201 })
 }
