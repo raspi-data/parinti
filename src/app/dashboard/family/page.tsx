@@ -335,10 +335,20 @@ export default async function FamilyDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {family.seniors.map((s) => (
                 <div key={s.id} className="bg-white rounded-xl border border-gray-200 p-4">
-                  <p className="font-medium text-gray-900">{s.nume}</p>
-                  <p className="text-sm text-gray-500">{s.varsta} ani &bull; {s.judet}</p>
-                  <p className="text-xs text-gray-400 mt-1">{s.nevoi}</p>
-                  {s.conditii && <p className="text-xs text-gray-400 mt-0.5">Condiții: {s.conditii}</p>}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900">{s.nume}</p>
+                      <p className="text-sm text-gray-500">{s.varsta} ani &bull; {s.judet}</p>
+                      <p className="text-xs text-gray-400 mt-1">{s.nevoi}</p>
+                      {s.conditii && <p className="text-xs text-gray-400 mt-0.5">Condiții: {s.conditii}</p>}
+                    </div>
+                    <Link
+                      href={`/dashboard/family/seniors/${s.id}/edit`}
+                      className="shrink-0 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 font-medium"
+                    >
+                      Editează
+                    </Link>
+                  </div>
                 </div>
               ))}
             </div>
